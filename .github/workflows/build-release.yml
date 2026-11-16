@@ -124,7 +124,7 @@ jobs:
           s=p.read_text()
           marker='    lint { abortOnError = true; checkReleaseBuilds = true }'
           assert marker in s
-          p.write_text(s.replace(marker,marker+'\\n    if (petalEnabled) lint.disable.add("NotificationPermission")').replace('\\n','\n'))
+          p.write_text(s.replace(marker, marker + chr(10) + '    if (petalEnabled) lint.disable.add("NotificationPermission")'))
           PY
           ./gradlew :engine:test :app:assembleRelease :app:lintRelease --no-daemon -PpetalAds=true
           python3 tools/verify_release.py app/build/outputs/apk/release/app-release.apk --sdk "$ANDROID_HOME" --advertising production --output release-checks
