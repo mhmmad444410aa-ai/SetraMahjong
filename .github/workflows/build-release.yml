@@ -103,6 +103,8 @@ jobs:
           source "$RUNNER_TEMP/setra-private/env.sh"
           set +a
           export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-private/setra-release.jks"
+          # Publicly hosted multilingual policy; corrects an incorrectly entered HTTPS secret.
+          export SETRA_PRIVACY_URL="https://github.com/mhmmad444410aa-ai/SetraMahjong/blob/main/PRIVACY_POLICY.md"
           keytool -list -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD >/dev/null
           python3 tools/check_translations.py
           python3 tools/check_ads_integration.py
