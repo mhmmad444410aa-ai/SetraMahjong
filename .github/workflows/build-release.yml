@@ -1,0 +1,132 @@
+name: Build Setra Mahjong Signed Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      advertising:
+        description: "Ad mode"
+        type: choice
+        required: true
+        default: production
+        options:
+          - production
+          - test
+          - offline
+  push:
+    paths:
+      - "SetraMahjong_120_Project.zip"
+      - "SetraMahjong_1.2.0_HuaweiAds_Source_GitHub.zip"
+      - ".github/workflows/build-release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      SETRA_KEYSTORE_BASE64: ${{ secrets.SETRA_KEYSTORE_BASE64 }}
+      SETRA_STORE_PASSWORD: ${{ secrets.SETRA_STORE_PASSWORD }}
+      SETRA_KEY_ALIAS: ${{ secrets.SETRA_KEY_ALIAS }}
+      SETRA_KEY_PASSWORD: ${{ secrets.SETRA_KEY_PASSWORD }}
+      SETRA_DEVELOPER_NAME: ${{ secrets.SETRA_DEVELOPER_NAME }}
+      SETRA_CONTACT_EMAIL: ${{ secrets.SETRA_CONTACT_EMAIL }}
+      SETRA_PRIVACY_URL: ${{ secrets.SETRA_PRIVACY_URL }}
+      ADS_BUILD_MODE: ${{ inputs.advertising || 'production' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unpack full Android project from ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP=""
+          for candidate in SetraMahjong_120_Project.zip SetraMahjong_1.2.0_HuaweiAds_Source_GitHub.zip; do
+            if [ -s "$candidate" ]; then ZIP="$candidate"; break; fi
+          done
+          if [ -z "$ZIP" ]; then
+            echo "::error::Upload SetraMahjong_120_Project.zip to the repository root first."
+            exit 1
+          fi
+          mkdir -p project
+          unzip -q "$ZIP" -d project
+          test -f project/SetraMahjong/gradlew
+          test -f project/SetraMahjong/app/build.gradle.kts
+          chmod +x project/SetraMahjong/gradlew
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore original signing key from Secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for v in SETRA_KEYSTORE_BASE64 SETRA_STORE_PASSWORD SETRA_KEY_ALIAS SETRA_KEY_PASSWORD; do
+            if [ -z "${!v:-}" ]; then
+              echo "::error::Missing GitHub Actions secret: $v"
+              exit 1
+            fi
+          done
+          export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-release.jks"
+          printf "%s" "$SETRA_KEYSTORE_BASE64" | base64 --decode > "$SETRA_KEYSTORE_PATH"
+          chmod 600 "$SETRA_KEYSTORE_PATH"
+          echo "SETRA_KEYSTORE_PATH=$SETRA_KEYSTORE_PATH" >> "$GITHUB_ENV"
+          keytool -list -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD >/dev/null
+
+      - name: Validate translations and ad integration
+        working-directory: project/SetraMahjong
+        run: |
+          python3 tools/check_translations.py
+          python3 tools/check_ads_integration.py
+          ./gradlew :engine:test --no-daemon
+
+      - name: Build signed release with Huawei Ads
+        working-directory: project/SetraMahjong
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          case "$ADS_BUILD_MODE" in
+            production) args+=("-PpetalAds=true");;
+            test) args+=("-PpetalAds=true" "-PadsTestMode=true");;
+            offline) ;;
+            *) echo "::error::Invalid ad mode"; exit 1;;
+          esac
+          ./gradlew :app:assembleRelease :app:lintRelease --no-daemon "${args[@]}"
+
+      - name: Verify APK certificate and release identity
+        working-directory: project/SetraMahjong
+        shell: bash
+        run: |
+          python3 tools/verify_release.py app/build/outputs/apk/release/app-release.apk --sdk "$ANDROID_HOME" --advertising "$ADS_BUILD_MODE" --output release-checks
+
+      - name: Publish APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SetraMahjong-1.2.0-Release-${{ env.ADS_BUILD_MODE }}
+          path: |
+            project/SetraMahjong/app/build/outputs/apk/release/app-release.apk
+            project/SetraMahjong/release-checks/
+            project/SetraMahjong/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove temporary key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/setra-release.jks"
