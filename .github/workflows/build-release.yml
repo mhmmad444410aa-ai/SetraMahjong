@@ -84,51 +84,42 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Secure ephemeral signature and production build
+      - name: Build signed production Release with repository secrets
         shell: bash
         working-directory: project/SetraMahjong
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          CERT="$RUNNER_TEMP/one-time.crt"
-          KEY="$RUNNER_TEMP/one-time.key"
-          openssl req -newkey rsa:3072 -x509 -nodes -days 1 -sha256 -keyout "$KEY" -out "$CERT" -subj "/CN=SetraMahjong-Run-${GITHUB_RUN_ID}" >/dev/null 2>&1
-          gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/.secure-transfer/${GITHUB_RUN_ID}.pem" -f message="Public one-time signing certificate ${GITHUB_RUN_ID}" -f content="$(base64 -w0 "$CERT")" >/dev/null
-          echo "One-time public certificate ready for encrypted signing transfer"
-          ARRIVED=0
-          for i in $(seq 1 180); do
-            if gh api "repos/$GITHUB_REPOSITORY/contents/.secure-transfer/${GITHUB_RUN_ID}.cms.txt" --jq '.content' > "$RUNNER_TEMP/signing-download.txt" 2>/dev/null; then ARRIVED=1; break; fi
-            sleep 4
+          for name in SETRA_KEYSTORE_BASE64 SETRA_STORE_PASSWORD SETRA_KEY_ALIAS SETRA_KEY_PASSWORD SETRA_DEVELOPER_NAME SETRA_CONTACT_EMAIL SETRA_PRIVACY_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing or empty repository secret: $name"
+              exit 1
+            fi
           done
-          if [ "$ARRIVED" != 1 ]; then echo "::error::Encrypted signing package unavailable"; exit 1; fi
-          base64 -d "$RUNNER_TEMP/signing-download.txt" | base64 -d > "$RUNNER_TEMP/signing.cms"
-          openssl cms -decrypt -binary -inform DER -in "$RUNNER_TEMP/signing.cms" -recip "$CERT" -inkey "$KEY" -out "$RUNNER_TEMP/signing.tar.gz"
-          mkdir -p "$RUNNER_TEMP/setra-private"
-          tar -xzf "$RUNNER_TEMP/signing.tar.gz" -C "$RUNNER_TEMP/setra-private"
-          test -f "$RUNNER_TEMP/setra-private/setra-release.jks"
-          test -f "$RUNNER_TEMP/setra-private/env.sh"
-          set -a
-          source "$RUNNER_TEMP/setra-private/env.sh"
-          set +a
-          export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-private/setra-release.jks"
-          keytool -list -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD >/dev/null
+
+          export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-release.jks"
+          if ! printf "%s" "$SETRA_KEYSTORE_BASE64" | base64 --decode > "$SETRA_KEYSTORE_PATH"; then
+            echo "::error::SETRA_KEYSTORE_BASE64 is not valid Base64"
+            exit 1
+          fi
+          chmod 600 "$SETRA_KEYSTORE_PATH"
+          if ! keytool -list -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD >/dev/null; then
+            echo "::error::Original keystore, alias or store password is invalid"
+            exit 1
+          fi
+
           python3 tools/check_translations.py
           python3 tools/check_ads_integration.py
-          # Huawei Ads SDK calls notification APIs internally but this game does not
-          # request notification permission or post notifications itself.
-          # Suppress only that third-party SDK lint rule; all other lint checks remain active.
+          # Petal Ads SDK references notification APIs; exclude only this third-party lint warning.
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app/build.gradle.kts')
-          s=p.read_text()
+          source=p.read_text()
           marker='    lint { abortOnError = true; checkReleaseBuilds = true }'
-          assert marker in s
-          p.write_text(s.replace(marker, marker + chr(10) + '    if (petalEnabled) lint.disable.add("NotificationPermission")'))
+          assert marker in source, 'Android lint block changed; review manually'
+          p.write_text(source.replace(marker,marker + '\n' + '    if (petalEnabled) lint.disable.add("NotificationPermission")'))
           PY
           ./gradlew :engine:test :app:assembleRelease :app:lintRelease --no-daemon -PpetalAds=true
           python3 tools/verify_release.py app/build/outputs/apk/release/app-release.apk --sdk "$ANDROID_HOME" --advertising production --output release-checks
-          echo "Production Release passed certificate, APK, ad-ID and alignment checks"
 
       - name: Publish APK as workflow artifact
         uses: actions/upload-artifact@v4
@@ -141,17 +132,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Delete temporary exchange and signing material
+      - name: Delete temporary signing material
         if: always()
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          set +e
-          for path in ".secure-transfer/${GITHUB_RUN_ID}.cms.txt" ".secure-transfer/${GITHUB_RUN_ID}.pem"; do
-            SHA="$(gh api "repos/$GITHUB_REPOSITORY/contents/$path" --jq '.sha' 2>/dev/null)"
-            if [ -n "$SHA" ]; then
-              gh api -X DELETE "repos/$GITHUB_REPOSITORY/contents/$path" -f message="Expire transfer ${GITHUB_RUN_ID}" -f sha="$SHA" >/dev/null
-            fi
-          done
-          rm -rf "$RUNNER_TEMP/setra-private" "$RUNNER_TEMP/signing.tar.gz" "$RUNNER_TEMP/signing.cms" "$RUNNER_TEMP/signing-download.txt" "$RUNNER_TEMP/one-time.crt" "$RUNNER_TEMP/one-time.key"
+          rm -f "$RUNNER_TEMP/setra-release.jks"
