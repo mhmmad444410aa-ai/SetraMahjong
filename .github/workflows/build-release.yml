@@ -118,9 +118,13 @@ jobs:
           s=p.read_text()
           marker='    lint { abortOnError = true; checkReleaseBuilds = true }'
           assert marker in s
-          p.write_text(s.replace(marker, marker + chr(10) + '    if (petalEnabled) lint.disable.add("NotificationPermission")'))
+          p.write_text(s.replace(marker, marker + chr(10) + '    if (petalEnabled) lint.disable.add("NotificationPermission")' + chr(10) + '    if (petalEnabled) lint.disable.add("QueryAllPackagesPermission")'))
           PY
           ./gradlew :engine:test :app:assembleRelease :app:lintRelease --no-daemon -PpetalAds=true
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions app/build/outputs/apk/release/app-release.apk | grep -F "android.permission.QUERY_ALL_PACKAGES"; then
+            echo "::error::Broad package visibility must not be in final APK"
+            exit 1
+          fi
           python3 tools/verify_release.py app/build/outputs/apk/release/app-release.apk --sdk "$ANDROID_HOME" --advertising production --output release-checks
           echo "Original certificate, APK identity, ad IDs and Android signing verified."
 
