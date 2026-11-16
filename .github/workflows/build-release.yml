@@ -63,11 +63,25 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Use runner Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          command -v sdkmanager
+          sdkmanager --version
 
       - name: Install SDK 36
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Compile and check project before signing
+        working-directory: project/SetraMahjong
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/check_translations.py
+          python3 tools/check_ads_integration.py
+          ./gradlew --no-daemon :engine:test :app:compileReleaseKotlin -PpetalAds=true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
