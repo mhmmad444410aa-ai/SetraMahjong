@@ -17,6 +17,7 @@ on:
       - "SetraMahjong_120_Project.zip"
       - "SetraMahjong_1.2.0_HuaweiAds_Source_GitHub.zip"
       - ".github/workflows/build-release.yml"
+      - "tools/patch-release-121.py"
 
 permissions:
   contents: write
@@ -56,6 +57,10 @@ jobs:
           test -f project/SetraMahjong/gradlew
           test -f project/SetraMahjong/app/build.gradle.kts
           chmod +x project/SetraMahjong/gradlew
+
+      - name: Enforce English-first UI and remove custom ad-choice messages
+        shell: bash
+        run: python3 tools/patch-release-121.py project/SetraMahjong
 
       - name: Java 17
         uses: actions/setup-java@v4
@@ -131,7 +136,7 @@ jobs:
       - name: Publish APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SetraMahjong-1.2.0-Release-${{ env.ADS_BUILD_MODE }}
+          name: SetraMahjong-1.2.1-Release-${{ env.ADS_BUILD_MODE }}
           path: |
             project/SetraMahjong/app/build/outputs/apk/release/app-release.apk
             project/SetraMahjong/release-checks/
