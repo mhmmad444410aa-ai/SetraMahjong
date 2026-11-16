@@ -1,0 +1,48 @@
+name: Publish verified Setra Mahjong 1.2.1 APK
+
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-121.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download verified successful Release APK artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p downloaded dist
+          gh run download 43822636052 --repo "$GITHUB_REPOSITORY" --name "SetraMahjong-1.2.1-Release-production" --dir downloaded
+          APK="$(find downloaded -type f -name app-release.apk -print -quit)"
+          if [ ! -f "$APK" ]; then
+            echo "::error::Verified signed APK missing from artifact"
+            exit 1
+          fi
+          cp "$APK" dist/SetraMahjong-v1.2.1-Release.apk
+          printf '%s  %s\n' "0348845cf3c4a5500a1949498e72baadac9c05bd2a5a9ebb9de8b13f88ba7207" "dist/SetraMahjong-v1.2.1-Release.apk" | sha256sum --check
+          echo "Verified Release APK SHA-256 before publication"
+
+      - name: Publish stable direct APK link under GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "v1.2.1" "dist/SetraMahjong-v1.2.1-Release.apk#Setra Mahjong 1.2.1 Signed Release" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Setra Mahjong 1.2.1 — Android Release" \
+            --notes "Signed production APK (versionCode 4), package com.mhmmad.setramahjong. English (UK) first-run default; no custom in-app advertising-choice popup. Supports Arabic and Brazilian Portuguese. Huawei Ads banner and interstitial IDs integrated. Certificate and package identity checked in the original build. Test on a device before AppGallery submission."
+          echo "https://github.com/$GITHUB_REPOSITORY/releases/download/v1.2.1/SetraMahjong-v1.2.1-Release.apk"
