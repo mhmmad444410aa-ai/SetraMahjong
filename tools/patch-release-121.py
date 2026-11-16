@@ -55,6 +55,12 @@ edit('app/build.gradle.kts', [('versionCode = 3','versionCode = 4'),('versionNam
 edit('tools/verify_release.py', [
  ('"versionCode=\\'3\\'" in badging and "versionName=\\'1.2.0\\'" in badging','"versionCode=\\'4\\'" in badging and "versionName=\\'1.2.1\\'" in badging'),
  ("'versionName':'1.2.0','versionCode':3","'versionName':'1.2.1','versionCode':4")])
+edit('tools/check_ads_integration.py', [
+ ('versionCode = 3','versionCode = 4'),
+ ('versionName = "1.2.0"','versionName = "1.2.1"'),
+ ("versionCode='3'","versionCode='4'"),
+ ("versionName='1.2.0'","versionName='1.2.1'"),
+ ('Static Setra Mahjong 1.2.0 integration checks','Static Setra Mahjong 1.2.1 integration checks')])
 petal=(root/'app/src/petal/java/com/mhmmad/setramahjong/ads/PetalProvider.kt').read_text()
 assert 'review=true' not in petal
 assert 'setNonPersonalizedAd(1)' in petal
