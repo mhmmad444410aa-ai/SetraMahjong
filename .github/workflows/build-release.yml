@@ -19,7 +19,7 @@ on:
       - ".github/workflows/build-release.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android-release:
@@ -84,48 +84,40 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Restore original signing key from Secrets
+      - name: Secure ephemeral signature and production build
         shell: bash
+        working-directory: project/SetraMahjong
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for v in SETRA_KEYSTORE_BASE64 SETRA_STORE_PASSWORD SETRA_KEY_ALIAS SETRA_KEY_PASSWORD; do
-            if [ -z "${!v:-}" ]; then
-              echo "::error::Missing GitHub Actions secret: $v"
-              exit 1
-            fi
+          CERT="$RUNNER_TEMP/one-time.crt"
+          KEY="$RUNNER_TEMP/one-time.key"
+          openssl req -newkey rsa:3072 -x509 -nodes -days 1 -sha256 -keyout "$KEY" -out "$CERT" -subj "/CN=SetraMahjong-Run-${GITHUB_RUN_ID}" >/dev/null 2>&1
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/.secure-transfer/${GITHUB_RUN_ID}.pem" -f message="Public one-time signing certificate ${GITHUB_RUN_ID}" -f content="$(base64 -w0 "$CERT")" >/dev/null
+          echo "One-time public certificate ready for encrypted signing transfer"
+          ARRIVED=0
+          for i in $(seq 1 180); do
+            if gh api "repos/$GITHUB_REPOSITORY/contents/.secure-transfer/${GITHUB_RUN_ID}.cms.txt" --jq '.content' > "$RUNNER_TEMP/signing-download.txt" 2>/dev/null; then ARRIVED=1; break; fi
+            sleep 4
           done
-          export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-release.jks"
-          printf "%s" "$SETRA_KEYSTORE_BASE64" | base64 --decode > "$SETRA_KEYSTORE_PATH"
-          chmod 600 "$SETRA_KEYSTORE_PATH"
-          echo "SETRA_KEYSTORE_PATH=$SETRA_KEYSTORE_PATH" >> "$GITHUB_ENV"
+          if [ "$ARRIVED" != 1 ]; then echo "::error::Encrypted signing package unavailable"; exit 1; fi
+          base64 -d "$RUNNER_TEMP/signing-download.txt" | base64 -d > "$RUNNER_TEMP/signing.cms"
+          openssl cms -decrypt -binary -inform DER -in "$RUNNER_TEMP/signing.cms" -recip "$CERT" -inkey "$KEY" -out "$RUNNER_TEMP/signing.tar.gz"
+          mkdir -p "$RUNNER_TEMP/setra-private"
+          tar -xzf "$RUNNER_TEMP/signing.tar.gz" -C "$RUNNER_TEMP/setra-private"
+          test -f "$RUNNER_TEMP/setra-private/setra-release.jks"
+          test -f "$RUNNER_TEMP/setra-private/env.sh"
+          set -a
+          source "$RUNNER_TEMP/setra-private/env.sh"
+          set +a
+          export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-private/setra-release.jks"
           keytool -list -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD >/dev/null
-
-      - name: Validate translations and ad integration
-        working-directory: project/SetraMahjong
-        run: |
           python3 tools/check_translations.py
           python3 tools/check_ads_integration.py
-          ./gradlew :engine:test --no-daemon
-
-      - name: Build signed release with Huawei Ads
-        working-directory: project/SetraMahjong
-        shell: bash
-        run: |
-          set -euo pipefail
-          args=()
-          case "$ADS_BUILD_MODE" in
-            production) args+=("-PpetalAds=true");;
-            test) args+=("-PpetalAds=true" "-PadsTestMode=true");;
-            offline) ;;
-            *) echo "::error::Invalid ad mode"; exit 1;;
-          esac
-          ./gradlew :app:assembleRelease :app:lintRelease --no-daemon "${args[@]}"
-
-      - name: Verify APK certificate and release identity
-        working-directory: project/SetraMahjong
-        shell: bash
-        run: |
-          python3 tools/verify_release.py app/build/outputs/apk/release/app-release.apk --sdk "$ANDROID_HOME" --advertising "$ADS_BUILD_MODE" --output release-checks
+          ./gradlew :engine:test :app:assembleRelease :app:lintRelease --no-daemon -PpetalAds=true
+          python3 tools/verify_release.py app/build/outputs/apk/release/app-release.apk --sdk "$ANDROID_HOME" --advertising production --output release-checks
+          echo "Production Release passed certificate, APK, ad-ID and alignment checks"
 
       - name: Publish APK as workflow artifact
         uses: actions/upload-artifact@v4
@@ -138,7 +130,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Remove temporary key
+      - name: Delete temporary exchange and signing material
         if: always()
         shell: bash
-        run: rm -f "$RUNNER_TEMP/setra-release.jks"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          for path in ".secure-transfer/${GITHUB_RUN_ID}.cms.txt" ".secure-transfer/${GITHUB_RUN_ID}.pem"; do
+            SHA="$(gh api "repos/$GITHUB_REPOSITORY/contents/$path" --jq '.sha' 2>/dev/null)"
+            if [ -n "$SHA" ]; then
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/contents/$path" -f message="Expire transfer ${GITHUB_RUN_ID}" -f sha="$SHA" >/dev/null
+            fi
+          done
+          rm -rf "$RUNNER_TEMP/setra-private" "$RUNNER_TEMP/signing.tar.gz" "$RUNNER_TEMP/signing.cms" "$RUNNER_TEMP/signing-download.txt" "$RUNNER_TEMP/one-time.crt" "$RUNNER_TEMP/one-time.key"
