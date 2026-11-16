@@ -4,10 +4,14 @@
 
 ## حالة المستودع
 - ملف GitHub Actions جاهز في `.github/workflows/build-release.yml`.
-- **ملف مصدر المشروع ZIP لم يُرفع بعد**. يجب رفع `SetraMahjong_120_Project.zip` إلى جذر المستودع، ثم تبدأ مهمة البناء تلقائيًا.
-- لا يوجد APK جديد حتى ينجح البناء والتوقيع ويظهر ملف `app-release.apk` ضمن Artifacts.
+- **تم رفع ملف المصدر** `SetraMahjong_120_Project.zip` إلى جذر المستودع. يفك GitHub Actions ضغطه تلقائيًا عند التشغيل.
+- لا يوجد APK جديد حتى ينجح البناء والتوقيع ويظهر ملف `app-release.apk` ضمن Artifacts. إصدار Release الإنتاجي يتطلب ضبط أسرار التوقيع ومعلومات الناشر في Settings → Secrets and variables → Actions.
 
-## رفع المشروع من الهاتف
+## المشروع مرفوع (لا تكرر الرفع)
+
+الخطوة التالية: أضف أسرار GitHub المطلوبة أدناه؛ لا تضع كلمات المرور داخل README أو ملفات المشروع. بعد ذلك شغّل Workflow من Actions → Build Setra Mahjong Signed Release → Run workflow، واختر production.
+
+## طريقة رفع المشروع من الهاتف (للتحديثات القادمة)
 1. افتح https://github.com/mhmmad444410aa-ai/SetraMahjong/upload/main
 2. اضغط `choose your files` واختر `SetraMahjong_120_Project.zip` الذي نزّلته من ChatGPT.
 3. اضغط `Commit changes`.
