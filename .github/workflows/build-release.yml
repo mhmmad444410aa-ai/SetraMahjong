@@ -105,6 +105,10 @@ jobs:
           export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-private/setra-release.jks"
           # Publicly hosted multilingual policy; corrects an incorrectly entered HTTPS secret.
           export SETRA_PRIVACY_URL="https://github.com/mhmmad444410aa-ai/SetraMahjong/blob/main/PRIVACY_POLICY.md"
+          # Recover the publisher's publicly recorded commit email only when the secret is malformed.
+          if [[ "$SETRA_CONTACT_EMAIL" != *"@"* ]]; then
+            export SETRA_CONTACT_EMAIL="$(gh api "repos/$GITHUB_REPOSITORY/commits/8fe8a72b9858bfac28cd34c82589048a9a5bd448" --jq '.commit.author.email')"
+          fi
           keytool -list -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD >/dev/null
           python3 tools/check_translations.py
           python3 tools/check_ads_integration.py
