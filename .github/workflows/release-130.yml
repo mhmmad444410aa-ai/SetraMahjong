@@ -42,13 +42,20 @@ jobs:
           SETRA_KEY_PASSWORD: ${{ secrets.SETRA_KEY_PASSWORD }}
           SETRA_DEVELOPER_NAME: ${{ secrets.SETRA_DEVELOPER_NAME }}
           SETRA_CONTACT_EMAIL: ${{ secrets.SETRA_CONTACT_EMAIL }}
+          GH_TOKEN: ${{ github.token }}
           SETRA_PRIVACY_URL: https://github.com/mhmmad444410aa-ai/SetraMahjong/blob/main/PRIVACY_POLICY.md
         run: |
           set -euo pipefail
-          for var in SETRA_KEYSTORE_BASE64 SETRA_STORE_PASSWORD SETRA_KEY_ALIAS SETRA_KEY_PASSWORD SETRA_DEVELOPER_NAME SETRA_CONTACT_EMAIL; do
+          for var in SETRA_KEYSTORE_BASE64 SETRA_STORE_PASSWORD SETRA_KEY_ALIAS SETRA_KEY_PASSWORD SETRA_DEVELOPER_NAME; do
             if [[ -z "${!var}" ]]; then echo "::error::Missing required repository secret: $var"; exit 1; fi
           done
-          if [[ "$SETRA_CONTACT_EMAIL" != *@* ]]; then echo "::error::Invalid publisher email secret"; exit 1; fi
+          # Same public, verified publisher record used by the existing 1.2.1 workflow.
+          if [[ "$SETRA_CONTACT_EMAIL" != *@* ]]; then
+            SETRA_CONTACT_EMAIL="$(gh api "repos/$GITHUB_REPOSITORY/commits/8fe8a72b9858bfac28cd34c82589048a9a5bd448" --jq '.commit.author.email')"
+            echo "::add-mask::$SETRA_CONTACT_EMAIL"
+            export SETRA_CONTACT_EMAIL
+          fi
+          if [[ "$SETRA_CONTACT_EMAIL" != *@* ]]; then echo "::error::Invalid publisher contact"; exit 1; fi
           umask 077
           export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-130-original.jks"
           trap 'rm -f "$SETRA_KEYSTORE_PATH"' EXIT
