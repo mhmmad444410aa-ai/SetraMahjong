@@ -59,9 +59,31 @@ jobs:
           umask 077
           export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-130-original.jks"
           trap 'rm -f "$SETRA_KEYSTORE_PATH"' EXIT
-          printf '%s' "$SETRA_KEYSTORE_BASE64" | base64 --decode > "$SETRA_KEYSTORE_PATH"
+          # Accept common mobile copy/paste formatting, but never guess or regenerate a key.
+          python3 - <<'PY'
+          import base64, binascii, os, re
+          from pathlib import Path
+          s=os.environ["SETRA_KEYSTORE_BASE64"].strip()
+          if s.startswith("SETRA_KEYSTORE_BASE64="): s=s.split("=",1)[1].strip()
+          if len(s)>=2 and s[0]==s[-1] and s[0] in ("'",'"'): s=s[1:-1]
+          s=re.sub(r"\\r\\n|\\n|\\r|\s+", "", s)
+          s=s.replace("-","+").replace("_","/")
+          if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}",s):
+              raise SystemExit("::error::SETRA_KEYSTORE_BASE64 is not a valid encoded keystore. Replace it with base64 of the original .jks file, not its filename, SHA-256 or password.")
+          try:
+              raw=base64.b64decode(s+"="*((-len(s))%4),validate=True)
+          except (ValueError,binascii.Error):
+              raise SystemExit("::error::SETRA_KEYSTORE_BASE64 is invalid or truncated. Re-encode the original signing file.")
+          if len(raw)<256 or not (raw.startswith(bytes.fromhex("feedfeed")) or raw.startswith(bytes.fromhex("cececece")) or raw.startswith(b"\x30")):
+              raise SystemExit("::error::Decoded secret is not a supported signing keystore. Use the original .jks/.p12.")
+          Path(os.environ["SETRA_KEYSTORE_PATH"]).write_bytes(raw)
+          print("Keystore encoding and file structure passed; checking original certificate next.")
+          PY
           unset SETRA_KEYSTORE_BASE64
-          cert=$(LC_ALL=C keytool -list -v -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD)
+          if ! cert=$(LC_ALL=C keytool -list -v -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD 2>/dev/null); then
+            echo "::error::Cannot open original keystore. Check original file, SETRA_STORE_PASSWORD and SETRA_KEY_ALIAS."
+            exit 1
+          fi
           expected='7C:F0:F4:DE:26:60:DE:10:2C:F1:0A:EA:E0:D6:2F:D3:F3:3E:44:1F:47:D3:90:A7:B9:32:27:02:D6:FD:13:EC'
           if ! grep -Fq "$expected" <<< "$cert"; then echo "::error::Original certificate mismatch; refusing to sign"; exit 1; fi
           unset cert
