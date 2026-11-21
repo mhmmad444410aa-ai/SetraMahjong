@@ -35,7 +35,11 @@ import java.time.LocalDate
 
 /** New fully integrated, localized puzzle journeys. Never replaces the original Classic game. */
 @Composable internal fun gardenLabel(en:String,ar:String,pt:String):String {
-    val language=LocalConfiguration.current.locales[0].language
+    @Suppress("DEPRECATION")
+    val language=LocalConfiguration.current.let { config ->
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) config.locales[0].language
+        else config.locale.language
+    }
     return when(language){"ar"->ar;"pt"->pt;else->en}
 }
 
