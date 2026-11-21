@@ -1,5 +1,9 @@
 name: Build Setra Mahjong 1.3.0 Signed APK (run after updating secrets)
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-130.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -88,8 +92,16 @@ jobs:
           fi
           echo "Correct Setra signing file is installed."
           if ! LC_ALL=C keytool -list -keystore "$SETRA_KEYSTORE_PATH" -storepass:env SETRA_STORE_PASSWORD >/dev/null 2>&1; then
-            echo "::error::Correct JKS is present, but SETRA_STORE_PASSWORD is incorrect. Replace this one GitHub secret with the exact generated store password."
-            exit 1
+            # This new JKS was created with the same store/key password.
+            # If the user updated only one password secret correctly, recover safely.
+            if LC_ALL=C keytool -list -keystore "$SETRA_KEYSTORE_PATH" -storepass:env SETRA_KEY_PASSWORD >/dev/null 2>&1; then
+              echo "::warning::SETRA_STORE_PASSWORD is incorrect, but the private key password secret matches the store. Using the validated value for this run."
+              SETRA_STORE_PASSWORD="$SETRA_KEY_PASSWORD"
+              export SETRA_STORE_PASSWORD
+            else
+              echo "::error::Correct Setra JKS is installed, but neither SETRA_STORE_PASSWORD nor SETRA_KEY_PASSWORD matches its password. Both must be set to the exact value in the private setup file."
+              exit 1
+            fi
           fi
           if ! cert=$(LC_ALL=C keytool -list -v -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD 2>/dev/null); then
             echo "::error::Correct JKS and store password, but SETRA_KEY_ALIAS is incorrect. Replace with the exact alias from the new private setup."
