@@ -83,6 +83,6 @@ for rel in ("app/build.gradle.kts","tools/verify_release.py","tools/check_ads_in
     elif rel=="tools/verify_release.py":
         src=src.replace("versionCode='6'","versionCode='7'").replace("'versionCode':6","'versionCode':7")
     elif rel=="tools/check_ads_integration.py":
-        src=src.replace("versionCode = 6","versionCode = 7").replace("versionCode='6'","versionCode='7'")
+        src=src.replace("versionCode = 6","versionCode = 7").replace("versionCode = 5","versionCode = 7").replace("versionCode='6'","versionCode='7'").replace("versionCode='5'","versionCode='7'")
     path.write_text(src,encoding="utf-8")
 print("PASS: Setra 1.4.0 (7) integrates new illustrated mini modes in original Compose home; no ad-choice; original exclusive launcher")
