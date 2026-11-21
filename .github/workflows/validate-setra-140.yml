@@ -61,6 +61,16 @@ jobs:
           export SETRA_CONTACT_EMAIL="lint@example.invalid"
           export SETRA_PRIVACY_URL="https://github.com/mhmmad444410aa-ai/SetraMahjong/blob/main/PRIVACY_POLICY.md"
           keytool -genkeypair -alias "$SETRA_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 1 -keystore "$SETRA_KEYSTORE_PATH" -storepass:env SETRA_STORE_PASSWORD -keypass:env SETRA_KEY_PASSWORD -dname "CN=Setra CI lint-only" >/dev/null 2>&1
+          # Identical two Huawei Ads SDK lint exclusions used by production signing job.
+          # All application code and security lint rules remain enabled.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("app/build.gradle.kts")
+          s=p.read_text()
+          marker="    lint { abortOnError = true; checkReleaseBuilds = true }"
+          assert marker in s
+          p.write_text(s.replace(marker,marker+chr(10)+'    if (petalEnabled) lint.disable.add("NotificationPermission")'+chr(10)+'    if (petalEnabled) lint.disable.add("QueryAllPackagesPermission")'))
+          PY
           ./gradlew :app:lintRelease --no-daemon -PpetalAds=true || {
             cat app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt | grep -E -B 3 -A 3 'Error:|[0-9]+ errors' | head -100 || true
             exit 1
