@@ -75,7 +75,7 @@ import java.time.format.DateTimeFormatter
             }
             val rootPages=setOf("home","map","album","stats")
             BackHandler(ui.page!="home") {
-                when(ui.page){"game"->vm.pause();"pause"->vm.resume();"privacy","adprivacy"->vm.navigate("about");"how","about"->vm.navigate("settings");else->vm.navigate("home")}
+                when(ui.page){"game"->vm.pause();"pause"->vm.resume();"mini_routes","mini_memory","mini_daily"->vm.navigate("mini_hub");"privacy","adprivacy"->vm.navigate("about");"how","about"->vm.navigate("settings");else->vm.navigate("home")}
             }
             Surface(Modifier.fillMaxSize(),color=Emerald) {
                 Box(Modifier.fillMaxSize()) {
@@ -86,6 +86,8 @@ import java.time.format.DateTimeFormatter
                         Box(Modifier.weight(1f)) {
                             when(ui.page) {
                                 "home"->Home(vm,ui,prefs,completions,totals)
+                                 "mini_hub"->MiniGardenHub(onPick={vm.navigate(it)},onBack={vm.navigate("home")})
+                                 "mini_routes","mini_memory","mini_daily"->MiniGardenPlay(ui.page,onBack={vm.navigate("mini_hub")})
                                 "map"->MapScreen(vm,completions)
                                 "game"->ui.session?.let {s->PlayScreen(vm,ui,prefs,adProvider)}
                                 "pause"->PauseScreen(vm,onRestart={confirm="restart"})
@@ -154,13 +156,25 @@ import java.time.format.DateTimeFormatter
                 Surface(color=Emerald.copy(alpha=.8f),shape=CircleShape,border=BorderStroke(.7.dp,Gold.copy(alpha=.55f))) {
                     Text(stringResource(R.string.level_number,vm.nextLevel()),Modifier.padding(horizontal=18.dp,vertical=7.dp),color=Gold,fontSize=12.sp,fontWeight=FontWeight.Bold)
                 }
-                BloomMedallion(1,Modifier.size(132.dp).padding(5.dp))
+                val quiet=LocalQuietMotion.current
+                 val floatY=if(quiet)0f else rememberInfiniteTransition(label="floating emblem")
+                     .animateFloat(initialValue=-6f,targetValue=6f,
+                         animationSpec=infiniteRepeatable(tween(1900,easing=FastOutSlowInEasing),RepeatMode.Reverse),
+                         label="emblem breath").value
+                 BloomMedallion(1,Modifier.size(132.dp).padding(5.dp).graphicsLayer{translationY=floatY})
                 Text(title(R.string.hero_title),style=MaterialTheme.typography.headlineMedium,textAlign=TextAlign.Center)
+                 Surface(color=Gold.copy(alpha=.16f),shape=RoundedCornerShape(12.dp),border=BorderStroke(.7.dp,Gold.copy(alpha=.65f))){
+                     Text(gardenLabel("1.4 · THE PUZZLE ATELIER","١.٤ · مشغل الألغاز","1.4 · ATELIÊ DE ENIGMAS"),
+                         modifier=Modifier.padding(horizontal=11.dp,vertical=4.dp),
+                         color=Gold,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                 }
                 Spacer(Modifier.height(7.dp));Text(title(R.string.hero_body),fontSize=12.sp,lineHeight=18.sp,color=Ivory.copy(alpha=.88f),textAlign=TextAlign.Center)
             }
         }
         Spacer(Modifier.height(16.dp))
         GoldButton(if(u.sessions["campaign"]?.won==false)R.string.continue_game else R.string.begin_journey,enabled=!u.busy){if(!p.guideDone)vm.start(1,"tutorial",true)else vm.continueGame()}
+        Spacer(Modifier.height(12.dp))
+        MiniGardenPromo(onOpen={vm.navigate("mini_hub")})
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal=3.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
             Text(stringResource(R.string.level_progress,count),fontSize=11.sp,color=Ivory)
