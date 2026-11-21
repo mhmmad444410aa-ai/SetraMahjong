@@ -64,13 +64,13 @@ for rel in ("app/src/main/AndroidManifest.xml","app/src/petal/AndroidManifest.xm
             categories=[c.get(android+"name") for c in filt.findall("category")]
             if "android.intent.action.MAIN" in actions and "android.intent.category.LAUNCHER" in categories:
                 activity.remove(filt)
-        if rel.endswith("main/AndroidManifest.xml") and activity.get(android+"name") in (".MainActivity","com.mhmmad.setramahjong.MainActivity"):
+        if activity.get(android+"name") in (".MainActivity","com.mhmmad.setramahjong.MainActivity"):
             f=ET.SubElement(activity,"intent-filter")
             ET.SubElement(f,"action",{android+"name":"android.intent.action.MAIN"})
             ET.SubElement(f,"category",{android+"name":"android.intent.category.LAUNCHER"})
             count+=1
     tree.write(path,encoding="utf-8",xml_declaration=True)
-if count!=1:raise RuntimeError("Expected exactly one original MainActivity launcher")
+if count!=2:raise RuntimeError("Expected MainActivity launcher in both base and Petal overlays")
 
 for rel in ("app/build.gradle.kts","tools/verify_release.py","tools/check_ads_integration.py"):
     path=root/rel
