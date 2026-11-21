@@ -1,0 +1,49 @@
+name: Publish verified Setra Mahjong 1.3.0 signed review APK
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-130.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve validated and signed APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p downloaded dist
+          gh run download 44881746756 --repo "$GITHUB_REPOSITORY" --name "SetraMahjong-1.3.0-Signed-Review-Candidate-production" --dir downloaded
+          APK="$(find downloaded -type f -name app-release.apk -print -quit)"
+          MANIFEST="$(find downloaded -type f -name review-candidate-sha256.txt -print -quit)"
+          test -s "$APK"
+          test -s "$MANIFEST"
+          ACTUAL="$(sha256sum "$APK" | awk '{print $1}')"
+          EXPECTED="$(awk 'NR==1 {print $1}' "$MANIFEST")"
+          test "$ACTUAL" = "$EXPECTED" || { echo "::error::Artifact checksum mismatch"; exit 1; }
+          cp "$APK" dist/SetraMahjong-v1.3.0-Release.apk
+          (cd dist && sha256sum SetraMahjong-v1.3.0-Release.apk > SetraMahjong-v1.3.0-Release.apk.sha256)
+          echo "APK verified against signing workflow checksum"
+      - name: Create public prerelease download with verification hash
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TARGET="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/fix/appgallery-4-1-v1.3.0" --jq '.object.sha')"
+          test -n "$TARGET"
+          gh release create v1.3.0 \
+            dist/SetraMahjong-v1.3.0-Release.apk \
+            dist/SetraMahjong-v1.3.0-Release.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$TARGET" \
+            --prerelease \
+            --title "Setra Mahjong 1.3.0 — Signed Android Review Candidate" \
+            --notes "VersionCode 5. Package: com.mhmmad.setramahjong. Signed with the new authorized first-release key, certificate SHA-256 40:DB:65:6D:09:0E:22:D9:D1:CA:99:8E:F1:CC:9D:F5:6A:F5:01:F0:39:88:1A:39:2F:A5:39:EF:E8:46:A9:4B. CI checks: engine tests, Kotlin/Java compilation, lintRelease, APK signing and certificate verification. This is a prerelease candidate; on-device Huawei/EMUI testing and store approval have not been verified. Do not promote to production without device testing."
