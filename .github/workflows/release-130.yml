@@ -83,12 +83,24 @@ jobs:
           print("Keystore encoding and file structure passed; checking original certificate next.")
           PY
           unset SETRA_KEYSTORE_BASE64
+          # Check the public checksum of the newly generated signing file, not secret values.
+          expected_keystore_sha256='5f261cd3160ff83a62051a293466220ad43305aa4dda2d82ea6dddbb4a2cecb3'
+          actual_keystore_sha256="$(sha256sum "$SETRA_KEYSTORE_PATH" | cut -d' ' -f1)"
+          if [[ "$actual_keystore_sha256" != "$expected_keystore_sha256" ]]; then
+            echo "::error::SETRA_KEYSTORE_BASE64 does not match the newly generated Setra JKS. Update this GitHub secret with the COMPLETE value from the new private setup file."
+            exit 1
+          fi
+          echo "Correct Setra signing file is installed."
+          if ! LC_ALL=C keytool -list -keystore "$SETRA_KEYSTORE_PATH" -storepass:env SETRA_STORE_PASSWORD >/dev/null 2>&1; then
+            echo "::error::Correct JKS is present, but SETRA_STORE_PASSWORD is incorrect. Replace this one GitHub secret with the exact generated store password."
+            exit 1
+          fi
           if ! cert=$(LC_ALL=C keytool -list -v -keystore "$SETRA_KEYSTORE_PATH" -alias "$SETRA_KEY_ALIAS" -storepass:env SETRA_STORE_PASSWORD 2>/dev/null); then
-            echo "::error::Cannot open original keystore. Check original file, SETRA_STORE_PASSWORD and SETRA_KEY_ALIAS."
+            echo "::error::Correct JKS and store password, but SETRA_KEY_ALIAS is incorrect. Replace with the exact alias from the new private setup."
             exit 1
           fi
           expected='40:DB:65:6D:09:0E:22:D9:D1:CA:99:8E:F1:CC:9D:F5:6A:F5:01:F0:39:88:1A:39:2F:A5:39:EF:E8:46:A9:4B'
-          if ! grep -Fq "$expected" <<< "$cert"; then echo "::error::Original certificate mismatch; refusing to sign"; exit 1; fi
+          if ! grep -Fq "$expected" <<< "$cert"; then echo "::error::New Setra certificate mismatch; refusing to sign"; exit 1; fi
           unset cert
           python3 tools/check_translations.py
           python3 tools/check_ads_integration.py
