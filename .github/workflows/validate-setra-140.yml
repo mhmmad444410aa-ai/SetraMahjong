@@ -51,6 +51,16 @@ jobs:
         working-directory: project/SetraMahjong
         shell: bash
         run: |
+          # A disposable local test certificate satisfies the Gradle signing preflight.
+          # It is generated fresh in CI and is NEVER a production release or a publisher key.
+          export SETRA_KEYSTORE_PATH="$RUNNER_TEMP/setra-lint-only.jks"
+          export SETRA_STORE_PASSWORD="$(openssl rand -hex 20)"
+          export SETRA_KEY_PASSWORD="$SETRA_STORE_PASSWORD"
+          export SETRA_KEY_ALIAS="lint-only"
+          export SETRA_DEVELOPER_NAME="Lint Verification"
+          export SETRA_CONTACT_EMAIL="lint@example.invalid"
+          export SETRA_PRIVACY_URL="https://github.com/mhmmad444410aa-ai/SetraMahjong/blob/main/PRIVACY_POLICY.md"
+          keytool -genkeypair -alias "$SETRA_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 1 -keystore "$SETRA_KEYSTORE_PATH" -storepass:env SETRA_STORE_PASSWORD -keypass:env SETRA_KEY_PASSWORD -dname "CN=Setra CI lint-only" >/dev/null 2>&1
           ./gradlew :app:lintRelease --no-daemon -PpetalAds=true || {
             cat app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt | grep -E -B 3 -A 3 'Error:|[0-9]+ errors' | head -100 || true
             exit 1
