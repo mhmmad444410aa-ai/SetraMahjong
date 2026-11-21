@@ -10,6 +10,24 @@ jobs:
   inspect:
     runs-on: ubuntu-24.04
     steps:
+      - name: Checkout expansion source
+        uses: actions/checkout@v4
+        with:
+          ref: fix/appgallery-4-1-v1.3.0
+      - name: Inspect source and patch manifests without signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p project
+          unzip -q SetraMahjong_120_Project.zip -d project
+          python3 tools/patch-release-121.py project/SetraMahjong
+          python3 tools/patch-release-130.py project/SetraMahjong
+          echo '### ALL SOURCE MANIFESTS'
+          find project/SetraMahjong -path '*/src/*/AndroidManifest.xml' -print
+          echo '### MANIFEST WITH REMOVED OLD LAUNCHER'
+          cat project/SetraMahjong/app/src/main/AndroidManifest.xml
+          echo '### OTHER MAIN LAUNCHER SOURCE LOCATIONS'
+          grep -R -n -E 'android.intent.action.MAIN|LAUNCHER' project/SetraMahjong/app/src/ || true
       - uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
@@ -25,7 +43,9 @@ jobs:
           APK=$(find delivered -name app-release.apk -print -quit)
           test -s "$APK"
           test "$(sha256sum "$APK" | awk '{print $1}')" = 1dbf0ecc01dd8b8d5404a2355f39cbfbf4a5901e939cac6c2fd223547b1efe70
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -E "^package:|^launchable-activity:|^application-label"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -E "^package:|^launchable-activity:"
+          echo '### PACKAGED MANIFEST ACTIVITY AND LAUNCHER ITEMS'
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -E -B 18 -A 6 'android.intent.action.MAIN|android.intent.category.LAUNCHER|GardenActivity|MainActivity' | head -150
           LAUNCHER=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "^launchable-activity:" || true)
           if grep -F 'com.mhmmad.setramahjong.expansion.GardenActivity' <<< "$LAUNCHER"; then
             echo "RELEASE VERIFIED: 1.3.0 starts with the new Garden puzzle modes hub."
