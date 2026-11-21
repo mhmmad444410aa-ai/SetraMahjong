@@ -56,6 +56,10 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "versionCode='7' versionName='1.4.0'"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -E "package:|launchable-activity:|application-label:|MAIN" || true
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -E "android.intent.action.MAIN|GardenActivity|MainActivity|android.intent.category.LAUNCHER" || true
+          echo '--- Manifest launch activity details ---'
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -A 28 -B 5 -E 'MainActivity|GardenActivity|android.intent.action.MAIN' || true
+          echo '--- Android manifest merger report ---'
+          find app/build -type f -iname '*manifest*report*' | head -5 | while read -r report; do grep -n -A 8 -B 4 -E 'GardenActivity|MainActivity|LAUNCHER' "$report" | head -150 || true; done
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "launchable-activity: name='com.mhmmad.setramahjong.expansion.GardenActivity'"
           count=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -c 'android.intent.action.MAIN')
           test "$count" -eq 1
