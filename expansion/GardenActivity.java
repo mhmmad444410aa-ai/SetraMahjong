@@ -1,12 +1,15 @@
 package com.mhmmad.setramahjong.expansion;
 
 import android.app.Activity;
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Build;
+import android.window.OnBackInvokedDispatcher;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -26,12 +29,18 @@ public final class GardenActivity extends Activity {
     private int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
     @Override public void onCreate(Bundle b){super.onCreate(b);prefs=getSharedPreferences("setra_garden_v1",MODE_PRIVATE);
         lang=prefs.getString("lang","en-GB"); getWindow().setStatusBarColor(DARK);getWindow().setNavigationBarColor(DARK);
+        if(Build.VERSION.SDK_INT >= 33){
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
+        }
         if(b!=null){mode=b.getString("mode","");board=b.getIntArray("board");initial=b.getIntArray("initial");rows=b.getInt("rows");cols=b.getInt("cols");seed=b.getLong("seed");moves=b.getInt("moves");daily=b.getBoolean("daily");won=b.getBoolean("won");}
         if(board!=null&&!mode.isEmpty())showGame();else home();
     }
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putString("mode",mode);b.putIntArray("board",board);b.putIntArray("initial",initial);b.putInt("rows",rows);b.putInt("cols",cols);b.putLong("seed",seed);b.putInt("moves",moves);b.putBoolean("daily",daily);b.putBoolean("won",won);}
     @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null);super.onDestroy();}
-    @Override public void onBackPressed(){if(!mode.isEmpty())home();else super.onBackPressed();}
+    private void navigateBack(){if(!mode.isEmpty())home();else finish();}
+    @SuppressLint("GestureBackNavigation") // Fallback for pre-Android 13: modern gesture callback is registered above.
+    @Override public void onBackPressed(){navigateBack();}
     private GradientDrawable panel(int color,int stroke,float radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=0)d.setStroke(dp(1),stroke);return d;}
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setGravity(Gravity.START);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);t.setIncludeFontPadding(true);return t;}
     private void add(View v){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(10);body.addView(v,p);}
