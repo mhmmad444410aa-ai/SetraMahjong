@@ -38,5 +38,9 @@ for rel in ["app/build.gradle.kts","tools/verify_release.py","tools/check_ads_in
     p=root/rel;s=p.read_text(encoding="utf-8")
     if "1.2.1" not in s:raise RuntimeError("Missing expected 1.2.1 markers in "+rel)
     s=s.replace("1.2.1","1.3.0").replace("versionCode = 4","versionCode = 5").replace("versionCode='4'","versionCode='5'").replace("'versionCode':4","'versionCode':5")
+    if rel=="tools/verify_release.py":
+        old_cert="7C:F0:F4:DE:26:60:DE:10:2C:F1:0A:EA:E0:D6:2F:D3:F3:3E:44:1F:47:D3:90:A7:B9:32:27:02:D6:FD:13:EC"
+        new_cert="40:DB:65:6D:09:0E:22:D9:D1:CA:99:8E:F1:CC:9D:F5:6A:F5:01:F0:39:88:1A:39:2F:A5:39:EF:E8:46:A9:4B"
+        s=s.replace(old_cert,new_cert).replace(old_cert.replace(":","").lower(),new_cert.replace(":","").lower())
     p.write_text(s,encoding="utf-8")
 print("Expansion integrated; original activity retained:",name)
