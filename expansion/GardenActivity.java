@@ -38,10 +38,10 @@ public final class GardenActivity extends Activity {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
         }
-        if(b!=null){mode=b.getString("mode","");board=b.getIntArray("board");initial=b.getIntArray("initial");rows=b.getInt("rows");cols=b.getInt("cols");seed=b.getLong("seed");moves=b.getInt("moves");daily=b.getBoolean("daily");won=b.getBoolean("won");}
+        if(b!=null){mode=b.getString("mode","");board=b.getIntArray("board");initial=b.getIntArray("initial");rows=b.getInt("rows");cols=b.getInt("cols");seed=b.getLong("seed");moves=b.getInt("moves");daily=b.getBoolean("daily");won=b.getBoolean("won");campaignLevel=b.getInt("campaignLevel",0);}
         if(board!=null&&!mode.isEmpty())showGame();else home();
     }
-    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putString("mode",mode);b.putIntArray("board",board);b.putIntArray("initial",initial);b.putInt("rows",rows);b.putInt("cols",cols);b.putLong("seed",seed);b.putInt("moves",moves);b.putBoolean("daily",daily);b.putBoolean("won",won);}
+    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putString("mode",mode);b.putIntArray("board",board);b.putIntArray("initial",initial);b.putInt("rows",rows);b.putInt("cols",cols);b.putLong("seed",seed);b.putInt("moves",moves);b.putBoolean("daily",daily);b.putBoolean("won",won);b.putInt("campaignLevel",campaignLevel);}
     @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null);super.onDestroy();}
     private void navigateBack(){if(!mode.isEmpty())home();else finish();}
     @SuppressLint("GestureBackNavigation") // Fallback for pre-Android 13: modern gesture callback is registered above.
@@ -64,7 +64,7 @@ public final class GardenActivity extends Activity {
         TextView heading=text(title,30,IVORY,true);heading.setShadowLayer(dp(5),0,dp(3),0xff072b24);add(heading);
         TextView detail=text(subtitle,15,MUTE,false);detail.setPadding(0,0,0,dp(10));add(detail);
     }
-    private void home(){generation++;handler.removeCallbacksAndMessages(null);mode="";board=null;initial=null;locked=false;won=false;
+    private void home(){campaignLevel=0;generation++;handler.removeCallbacksAndMessages(null);mode="";board=null;initial=null;locked=false;won=false;
         frame(tr("A world of tile puzzles","عالم من ألغاز البلاطات","Um mundo de enigmas"),tr("Explore • Solve • Collect stars","استكشف • حل الألغاز • اجمع النجوم","Explore • Resolva • Colecione estrelas"));
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(20),dp(20),dp(20),dp(20));hero.setBackground(gradient(0xff694a96,0xff294f82,24));hero.setElevation(dp(7));
         TextView jewel=text("✦    ◆    ◈    ✧",38,GOLD,true);jewel.setGravity(Gravity.CENTER);hero.addView(jewel);
@@ -102,12 +102,13 @@ public final class GardenActivity extends Activity {
         status=text("",16,GOLD,true);add(status);grid=new GridLayout(this);grid.setColumnCount(cols);grid.setRowCount(rows);grid.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);add(grid);draw();
         if(routes)add(button(tr("Find a move","ابحث عن حركة","Encontrar jogada"),()->{int[] a=GardenEngine.hint(board,rows,cols);hintA=a[0];hintB=a[1];draw();if(a[0]<0&&!won)status.setText(tr("No moves. Restart this deal.","لا حركات متاحة. أعد هذا اللغز.","Sem jogadas. Reinicie este desafio."));}));
         add(button(tr("Restart this puzzle","أعد هذا اللغز","Reiniciar este enigma"),()->start(mode,rows,cols,seed,daily)));
+        if(won&&campaignLevel>0)add(button(tr("Continue campaign","متابعة المراحل","Continuar campanha"),this::campaign));
         add(button(tr("Garden home","الحديقة الرئيسية","Início do jardim"),this::home));
     }
     private void draw(){
         grid.removeAllViews();boolean memory=mode.equals("memory");
         int remaining=0;for(int x:board)if(x!=0)remaining++;
-        status.setText(won?tr("Garden complete!","أكملت الحديقة!","Jardim concluído!"):tr("Moves: ","الحركات: ","Jogadas: ")+moves+"   •   "+tr("Pairs left: ","الأزواج المتبقية: ","Pares restantes: ")+remaining/2+(daily?"   ◈":""));
+        status.setText(won?tr("★ ★ ★  Challenge complete!","★ ★ ★  اكتمل التحدي!","★ ★ ★  Desafio concluído!"):tr("Moves: ","الحركات: ","Jogadas: ")+moves+"   •   "+tr("Pairs left: ","الأزواج المتبقية: ","Pares restantes: ")+remaining/2+(daily?"   ◈":""));
         int width=Math.max(dp(40),(getResources().getDisplayMetrics().widthPixels-dp(36))/cols-dp(6));
         int height=Math.min(dp(70),Math.max(dp(48),width));
         for(int i=0;i<board.length;i++){final int idx=i;int val=board[i];boolean exposed=!memory||i==first||i==second;Button tile=new Button(this);tile.setAllCaps(false);tile.setMinWidth(0);tile.setMinimumWidth(0);tile.setMinHeight(0);tile.setMinimumHeight(0);tile.setPadding(0,0,0,0);tile.setTextSize(cols==6?20:26);tile.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
