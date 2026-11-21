@@ -44,14 +44,33 @@ for rel in ["app/build.gradle.kts","tools/verify_release.py","tools/check_ads_in
         s=s.replace(old_cert,new_cert).replace(old_cert.replace(":","").lower(),new_cert.replace(":","").lower())
         # First public release: verify against the explicitly authorized new signing cert.
         # Keep a strict 64-hex-digit certificate check rather than bypassing verification.
-        needle="    assert cert==expected,'Signing identity changed; do not publish as an update'"
-        if s.count(needle)!=1: raise RuntimeError("Unexpected certificate verifier logic; halt safely")
-        new_verify=chr(10).join([
-            "    import re",
-            "    expected='40db656d090e22d9d1ca998ef1cc9df56af501f039881a392fa539efe846a94b'",
-            "    normalized=re.sub(r'[^0-9a-f]', '', str(cert).lower())",
-            "    assert len(normalized)==64 and normalized==expected, 'Signing certificate does not match the authorized Setra 1.3.0 certificate'",
-        ])
-        s=s.replace(needle,new_verify)
+        # The inherited verifier expresses the old signature as a Python assert.
+        # Locate its exact cert-vs-expected expression using Python's AST, not
+        # a brittle textual match. Keep verification enabled with a fixed new digest.
+        import ast
+        parsed=ast.parse(s)
+        candidates=[]
+        for node in ast.walk(parsed):
+            if not isinstance(node,ast.Assert) or not isinstance(node.test,ast.Compare): continue
+            cmp=node.test
+            if (isinstance(cmp.left,ast.Name) and cmp.left.id=="cert" and
+                len(cmp.ops)==1 and isinstance(cmp.ops[0],ast.Eq) and
+                len(cmp.comparators)==1 and isinstance(cmp.comparators[0],ast.Name) and
+                cmp.comparators[0].id=="expected"):
+                candidates.append(node)
+        if len(candidates)!=1: raise RuntimeError("Expected exactly one certificate identity assertion")
+        node=candidates[0]
+        lines=s.splitlines(keepends=True)
+        original=lines[node.lineno-1]
+        indent=original[:len(original)-len(original.lstrip())]
+        replacement=chr(10).join(indent+x for x in [
+            "import re",
+            "expected='40db656d090e22d9d1ca998ef1cc9df56af501f039881a392fa539efe846a94b'",
+            "normalized=re.sub(r'[^0-9a-f]', '', str(cert).lower())",
+            "assert len(normalized)==64 and normalized==expected, 'Signing certificate does not match the authorized Setra 1.3.0 certificate'",
+        ])+chr(10)
+        lines[node.lineno-1:node.end_lineno]=[replacement]
+        s="".join(lines)
+
     p.write_text(s,encoding="utf-8")
 print("Expansion integrated; original activity retained:",name)
