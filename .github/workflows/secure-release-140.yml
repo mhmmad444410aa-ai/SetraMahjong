@@ -1,4 +1,4 @@
-name: Secure Setra Mahjong 1.4.0 Signed Review Release
+name: Secure Setra Mahjong 1.4.0 Signed Review Release - Verified Pass
 
 on:
   workflow_dispatch:
