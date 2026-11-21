@@ -40,6 +40,20 @@ once('Text(title(R.string.hero_title),style=MaterialTheme.typography.headlineMed
                          modifier=Modifier.padding(horizontal=11.dp,vertical=4.dp),
                          color=Gold,fontSize=10.sp,fontWeight=FontWeight.Bold)
                  }''')
+once('        LinearProgressIndicator(progress={1f-s.remaining.toFloat()/s.tiles.size},modifier=Modifier.fillMaxWidth().padding(horizontal=22.dp).height(4.dp).clip(CircleShape),color=Gold,trackColor=Ivory.copy(alpha=.13f))',
+     '''        AnimatedVisibility(u.combo>=2,enter=fadeIn(tween(180))+expandVertically(),exit=fadeOut(tween(150))+shrinkVertically()) {
+             Surface(Modifier.fillMaxWidth().padding(horizontal=22.dp,vertical=4.dp),
+                 color=Color(0xFF155E4B),shape=RoundedCornerShape(16.dp),
+                 border=BorderStroke(1.dp,Gold.copy(alpha=.7f))) {
+                 Row(Modifier.padding(horizontal=12.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically,
+                     horizontalArrangement=Arrangement.SpaceBetween) {
+                     Text(gardenLabel("MATCH STREAK","سلسلة تطابق","SEQUÊNCIA DE PARES"),
+                         color=Ivory,fontWeight=FontWeight.Bold,fontSize=12.sp)
+                     Text("✦  ×"+u.combo.toString(),color=Gold,fontWeight=FontWeight.ExtraBold,fontSize=17.sp)
+                 }
+             }
+         }
+         LinearProgressIndicator(progress={1f-s.remaining.toFloat()/s.tiles.size},modifier=Modifier.fillMaxWidth().padding(horizontal=22.dp).height(4.dp).clip(CircleShape),color=Gold,trackColor=Ivory.copy(alpha=.13f))''')
 if "consentDialog" in text or "adPrivacy.review" in text or '"adprivacy"' in text:
     raise RuntimeError("Do not restore the custom ad-choice UI removed in v1.2.1")
 screen.write_text(text,encoding="utf-8")
