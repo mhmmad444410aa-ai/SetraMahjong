@@ -28,6 +28,12 @@ jobs:
           cat project/SetraMahjong/app/src/main/AndroidManifest.xml
           echo '### OTHER MAIN LAUNCHER SOURCE LOCATIONS'
           grep -R -n -E 'android.intent.action.MAIN|LAUNCHER' project/SetraMahjong/app/src/ || true
+          echo '### PETAL MANIFEST'
+          cat project/SetraMahjong/app/src/petal/AndroidManifest.xml
+          echo '### DRAWABLE AND ASSET FILENAMES'
+          find project/SetraMahjong/app/src/main -type f | grep -E '/(drawable|mipmap|assets)/' | head -90 || true
+          echo '### ORIGINAL MAINACTIVITY FILES'
+          find project/SetraMahjong/app/src/main/java -type f | grep -E 'MainActivity|Theme|Home|Garden' | head -35 || true
       - uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
