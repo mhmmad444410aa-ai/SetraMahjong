@@ -1,10 +1,11 @@
-name: Validate Setra Mahjong 1.3.0 expansion
+name: Validate Setra Mahjong 1.3.1 expansion
 on:
   pull_request:
     branches: [main]
     paths:
       - 'expansion/**'
       - 'tools/patch-release-130.py'
+      - 'tools/patch-release-131.py'
       - '.github/workflows/validate-expansion.yml'
   workflow_dispatch:
 permissions:
@@ -30,6 +31,7 @@ jobs:
           unzip -q SetraMahjong_120_Project.zip -d project
           python3 tools/patch-release-121.py project/SetraMahjong
           python3 tools/patch-release-130.py project/SetraMahjong
+          python3 tools/patch-release-131.py project/SetraMahjong
           chmod +x project/SetraMahjong/gradlew
       - uses: android-actions/setup-android@v4
         with:
@@ -39,9 +41,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Compile and test Android debug build without release keys
         working-directory: project/SetraMahjong
-        run: ./gradlew :engine:test :app:assembleDebug --no-daemon -PpetalAds=false
+        run: ./gradlew :engine:test :app:assembleDebug --no-daemon -PpetalAds=true
+      - name: Assert Huawei flavor launches new Garden Routes/Memory hub
+        working-directory: project/SetraMahjong
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "versionCode='6' versionName='1.3.1'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "launchable-activity: name='com.mhmmad.setramahjong.expansion.GardenActivity'"
+          count=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -c 'android.intent.action.MAIN')
+          test "$count" -eq 1
       - uses: actions/upload-artifact@v4
         with:
-          name: SetraMahjong-1.3.0-debug-validation-only
+          name: SetraMahjong-1.3.1-debug-validation-only
           path: project/SetraMahjong/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
