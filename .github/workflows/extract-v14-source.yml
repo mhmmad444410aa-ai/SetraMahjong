@@ -1,0 +1,34 @@
+name: Prepare editable original Kotlin sources for 1.4.0
+on:
+  push:
+    branches: [feature/setra-1.4.0]
+    paths: ['.github/workflows/extract-v14-source.yml']
+permissions:
+  contents: write
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/setra-1.4.0
+          fetch-depth: 0
+      - name: Extract original game source, omitting credentials and binary assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/setra-original
+          unzip -q SetraMahjong_120_Project.zip -d /tmp/setra-original
+          src=/tmp/setra-original/SetraMahjong/app/src/main/java
+          test -d "$src"
+          mkdir -p source-v14
+          cd "$src"
+          find . -type f \( -name '*.kt' -o -name '*.java' \) -print0 | tar --null -T - -cf - | tar -xf - -C "$GITHUB_WORKSPACE/source-v14"
+          echo "SOURCE FILES:"
+          find "$GITHUB_WORKSPACE/source-v14" -type f -printf '%P %kKB\n' | sort | head -120
+          cd "$GITHUB_WORKSPACE"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source-v14
+          git commit -m 'Extract editable original Kotlin game source for visual and gameplay overhaul'
+          git push origin HEAD:feature/setra-1.4.0
