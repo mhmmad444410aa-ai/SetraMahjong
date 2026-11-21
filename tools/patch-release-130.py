@@ -46,13 +46,12 @@ for rel in ["app/build.gradle.kts","tools/verify_release.py","tools/check_ads_in
         # Keep a strict 64-hex-digit certificate check rather than bypassing verification.
         needle="    assert cert==expected,'Signing identity changed; do not publish as an update'"
         if s.count(needle)!=1: raise RuntimeError("Unexpected certificate verifier logic; halt safely")
-        new_verify=(
-            "    import re\\n"
-            "    expected='40db656d090e22d9d1ca998ef1cc9df56af501f039881a392fa539efe846a94b'\\n"
-            "    normalized=re.sub(r'[^0-9a-f]', '', str(cert).lower())\\n"
-            "    assert len(normalized)==64 and normalized==expected, "
-            "'Signing certificate does not match the authorized Setra 1.3.0 certificate'"
-        ).replace("\\n","\\n")
+        new_verify=chr(10).join([
+            "    import re",
+            "    expected='40db656d090e22d9d1ca998ef1cc9df56af501f039881a392fa539efe846a94b'",
+            "    normalized=re.sub(r'[^0-9a-f]', '', str(cert).lower())",
+            "    assert len(normalized)==64 and normalized==expected, 'Signing certificate does not match the authorized Setra 1.3.0 certificate'",
+        ])
         s=s.replace(needle,new_verify)
     p.write_text(s,encoding="utf-8")
 print("Expansion integrated; original activity retained:",name)
