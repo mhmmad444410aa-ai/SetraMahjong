@@ -46,6 +46,7 @@ screen.write_text(text,encoding="utf-8")
 source=here/"source-v14/com/mhmmad/setramahjong/ui/MiniGarden.kt"
 assert source.is_file()
 shutil.copy2(source,screen.with_name("MiniGarden.kt"))
+shutil.copy2(here/"source-v14/com/mhmmad/setramahjong/GameViewModel.kt",root/"app/src/main/java/com/mhmmad/setramahjong/GameViewModel.kt")
 
 # Make the enhanced ORIGINAL Compose app the only launcher in both main and Huawei Petal manifests.
 android="{http://schemas.android.com/apk/res/android}"
