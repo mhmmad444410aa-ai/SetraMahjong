@@ -47,6 +47,14 @@ jobs:
       - name: Unit tests and Android Huawei debug compilation
         working-directory: project/SetraMahjong
         run: ./gradlew :engine:test :app:assembleDebug --no-daemon -PpetalAds=true
+      - name: Run production Lint without signing and print all errors
+        working-directory: project/SetraMahjong
+        shell: bash
+        run: |
+          ./gradlew :app:lintRelease --no-daemon -PpetalAds=true || {
+            cat app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt | grep -E -B 3 -A 3 'Error:|[0-9]+ errors' | head -100 || true
+            exit 1
+          }
       - name: Verify actual installed launcher, version and three new modes
         shell: bash
         working-directory: project/SetraMahjong
