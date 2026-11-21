@@ -37,7 +37,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: fix/appgallery-4-1-v1.3.1
+          ref: fix/appgallery-4-1-v1.3.0
 
       - name: Unpack full Android project from ZIP
         shell: bash
