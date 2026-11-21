@@ -46,10 +46,16 @@ public final class GardenActivity extends Activity {
     private void add(View v){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(10);body.addView(v,p);}
     private Button button(String s,Runnable action){Button b=new Button(this);b.setAllCaps(false);b.setText(s);b.setTextSize(16);b.setTextColor(IVORY);b.setGravity(Gravity.CENTER);b.setMinHeight(dp(52));b.setPadding(dp(12),dp(10),dp(12),dp(10));b.setBackground(panel(JADE,GOLD,14));b.setOnClickListener(v->action.run());return b;}
     private void frame(String title,String subtitle){
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(DARK);
-        body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(18),dp(20),dp(18),dp(24));body.setLayoutDirection(lang.equals("ar")?View.LAYOUT_DIRECTION_RTL:View.LAYOUT_DIRECTION_LTR);
-        scroll.addView(body,new ScrollView.LayoutParams(-1,-2));setContentView(scroll);
-        add(text("◆   SETRA  /  GARDEN",13,GOLD,true));add(text(title,30,IVORY,true));add(text(subtitle,15,MUTE,false));
+        FrameLayout scene=new FrameLayout(this);
+        scene.addView(new GardenBackdrop(this),new FrameLayout.LayoutParams(-1,-1));
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.TRANSPARENT);
+        scroll.setVerticalScrollBarEnabled(false);
+        body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(22),dp(32),dp(22),dp(40));body.setLayoutDirection(lang.equals("ar")?View.LAYOUT_DIRECTION_RTL:View.LAYOUT_DIRECTION_LTR);
+        scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
+        scene.addView(scroll,new FrameLayout.LayoutParams(-1,-1));setContentView(scene);
+        TextView brand=text("✦  S E T R A   •   G A R D E N",12,GOLD,true);brand.setLetterSpacing(0.09f);add(brand);
+        TextView heading=text(title,30,IVORY,true);heading.setShadowLayer(dp(5),0,dp(3),0xff072b24);add(heading);
+        TextView detail=text(subtitle,15,MUTE,false);detail.setPadding(0,0,0,dp(10));add(detail);
     }
     private void home(){generation++;handler.removeCallbacksAndMessages(null);mode="";board=null;initial=null;locked=false;won=false;
         frame(tr("Your puzzle garden","حديقتك للألغاز","Seu jardim de enigmas"),tr("Three ways to play. One peaceful collection.","ثلاث طرق للعب. مجموعة هادئة واحدة.","Três formas de jogar. Uma coleção tranquila."));
