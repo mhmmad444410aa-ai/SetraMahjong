@@ -42,5 +42,17 @@ for rel in ["app/build.gradle.kts","tools/verify_release.py","tools/check_ads_in
         old_cert="7C:F0:F4:DE:26:60:DE:10:2C:F1:0A:EA:E0:D6:2F:D3:F3:3E:44:1F:47:D3:90:A7:B9:32:27:02:D6:FD:13:EC"
         new_cert="40:DB:65:6D:09:0E:22:D9:D1:CA:99:8E:F1:CC:9D:F5:6A:F5:01:F0:39:88:1A:39:2F:A5:39:EF:E8:46:A9:4B"
         s=s.replace(old_cert,new_cert).replace(old_cert.replace(":","").lower(),new_cert.replace(":","").lower())
+        # First public release: verify against the explicitly authorized new signing cert.
+        # Keep a strict 64-hex-digit certificate check rather than bypassing verification.
+        needle="    assert cert==expected,'Signing identity changed; do not publish as an update'"
+        if s.count(needle)!=1: raise RuntimeError("Unexpected certificate verifier logic; halt safely")
+        new_verify=(
+            "    import re\\n"
+            "    expected='40db656d090e22d9d1ca998ef1cc9df56af501f039881a392fa539efe846a94b'\\n"
+            "    normalized=re.sub(r'[^0-9a-f]', '', str(cert).lower())\\n"
+            "    assert len(normalized)==64 and normalized==expected, "
+            "'Signing certificate does not match the authorized Setra 1.3.0 certificate'"
+        ).replace("\\n","\\n")
+        s=s.replace(needle,new_verify)
     p.write_text(s,encoding="utf-8")
 print("Expansion integrated; original activity retained:",name)
