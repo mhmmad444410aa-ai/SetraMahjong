@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 
-data class GameUi(val ready:Boolean=false,val page:String="home",val session:Session?=null,val sessions:Map<String,Session> = emptyMap(),val busy:Boolean=false,val hint:PairStep?=null,val error:Int?=null,val resultFirst:Boolean=false,val elapsed:Long=0)
+data class GameUi(val ready:Boolean=false,val page:String="home",val session:Session?=null,val sessions:Map<String,Session> = emptyMap(),val busy:Boolean=false,val hint:PairStep?=null,val error:Int?=null,val resultFirst:Boolean=false,val elapsed:Long=0,val combo:Int=0,val bestCombo:Int=0)
 class GameViewModel(app:Application):AndroidViewModel(app) {
     private val repo=GameRepository(GameDatabase.open(app))
     private val prefsRepo=PreferenceRepository(app)
@@ -22,6 +22,7 @@ class GameViewModel(app:Application):AndroidViewModel(app) {
     val ui=state.asStateFlow()
     private val mutex=Mutex()
     private var foreground=true
+    private var lastMatchTime=0L
     init {
         viewModelScope.launch {
             prefsRepo.flow.first()
@@ -67,7 +68,8 @@ class GameViewModel(app:Application):AndroidViewModel(app) {
                         Generator.create(level,if(mode=="daily") LocalDate.now().toEpochDay()*104729L else 0x5345545241L+level*7919L,mode,key)
                     }
                     val saved=save(s)
-                    state.value=state.value.copy(resultFirst=false,hint=null)
+                    lastMatchTime=0L
+                    state.value=state.value.copy(resultFirst=false,hint=null,combo=0)
                     updateSaved(saved,"game")
                 } catch(_:Exception) { state.value=state.value.copy(busy=false,error=R.string.save_error) }
             }
@@ -86,6 +88,10 @@ class GameViewModel(app:Application):AndroidViewModel(app) {
         if(s.selectedId==null||s.selectedId==id) { state.value=u.copy(session=s.copy(selectedId=if(s.selectedId==id)null else id),hint=null);return }
         val n=Rules.match(s,s.selectedId ?: return,id)
         if(n==null) { state.value=u.copy(session=s.copy(selectedId=id),error=R.string.different_tiles,hint=null);return }
+        val now=android.os.SystemClock.elapsedRealtime()
+        val streak=if(lastMatchTime>0L && now-lastMatchTime<=12000L)u.combo+1 else 1
+        lastMatchTime=now
+        state.value=state.value.copy(combo=streak,bestCombo=maxOf(u.bestCombo,streak))
         commit(n,"match")
     }
     private fun commit(n:Session,action:String="",page:String?=null) {
@@ -119,7 +125,7 @@ class GameViewModel(app:Application):AndroidViewModel(app) {
             state.value=state.value.copy(hint=p)
         } catch(_:Exception){state.value=state.value.copy(busy=false,error=R.string.save_error)} } }
     }
-    fun undo() { val s=state.value.session?:return;val n=Rules.undo(s);if(n==null)state.value=state.value.copy(error=R.string.nothing_undo) else commit(n,"undo") }
+    fun undo() { val s=state.value.session?:return;val n=Rules.undo(s);if(n==null)state.value=state.value.copy(error=R.string.nothing_undo) else {lastMatchTime=0L;state.value=state.value.copy(combo=0);commit(n,"undo")} }
     fun shuffle() {
         val s=state.value.session?:return;if(state.value.busy)return
         state.value=state.value.copy(busy=true)
@@ -131,6 +137,8 @@ class GameViewModel(app:Application):AndroidViewModel(app) {
     }
     fun restart() { val s=state.value.session?:return;start(s.level,s.mode,true) }
     fun pause() {
+        lastMatchTime=0L
+        state.value=state.value.copy(combo=0)
         val s=state.value.session?:return
         if(s.won||state.value.page!="game")return
         // State changes immediately; no timer runs while the save is pending.
