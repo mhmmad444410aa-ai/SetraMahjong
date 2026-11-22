@@ -40,6 +40,18 @@ def inspect_and_fix(path):
 
 removed_main, found_main = inspect_and_fix(base)
 removed_petal, found_petal = inspect_and_fix(petal)
+# The Petal manifest is higher priority. Android manifest merger does not
+# match intent-filter elements, so removing the filter from the overlay
+# alone may still inherit the original MainActivity launcher from the ZIP.
+# Replace that activity declaration in the merged manifest while retaining
+# its Petal attributes; the new GardenActivity launcher remains in main.
+petal_tree = ET.parse(petal)
+petal_app = petal_tree.getroot().find("application")
+old_activities = [a for a in petal_app.findall("activity")
+                  if a.get(android+"name") == "com.mhmmad.setramahjong.MainActivity"]
+assert len(old_activities) == 1, "Expected exactly one Petal MainActivity"
+old_activities[0].set("{http://schemas.android.com/tools}node", "replace")
+petal_tree.write(petal, encoding="utf-8", xml_declaration=True)
 if (removed_main,found_main,removed_petal,found_petal) != (0,1,1,0):
     raise RuntimeError("Unexpected launcher state: main=%s petal=%s" % ((removed_main,found_main),(removed_petal,found_petal)))
 # AAB flavor overlay must not re-add the old launcher. Android's merged manifest should have just one launchable activity.
