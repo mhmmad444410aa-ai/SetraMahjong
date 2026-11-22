@@ -51,6 +51,26 @@ old_activities = [a for a in petal_app.findall("activity")
                   if a.get(android+"name") == "com.mhmmad.setramahjong.MainActivity"]
 assert len(old_activities) == 1, "Expected exactly one Petal MainActivity"
 old_activities[0].set("{http://schemas.android.com/tools}node", "replace")
+# The actual merged APK from CI had no GardenActivity at all, despite its
+# declaration in src/main. Put the single launcher filter in the Petal
+# overlay itself, and remove it from src/main to prevent duplicate filters.
+base_tree = ET.parse(base)
+base_app = base_tree.getroot().find("application")
+garden_main = [a for a in base_app.findall("activity") if a.get(android+"name") == launcher]
+assert len(garden_main) == 1, "Expected one base GardenActivity"
+garden_filters = [f for f in garden_main[0].findall("intent-filter") if is_launcher_filter(f)]
+assert len(garden_filters) == 1, "Expected one base GardenActivity launcher filter"
+garden_main[0].remove(garden_filters[0])
+base_tree.write(base, encoding="utf-8", xml_declaration=True)
+garden_petal = [a for a in petal_app.findall("activity") if a.get(android+"name") == launcher]
+assert not garden_petal, "Petal GardenActivity already exists"
+new_garden = ET.SubElement(petal_app, "activity", {
+    android+"name": launcher, android+"exported": "true",
+    "{http://schemas.android.com/tools}node": "replace",
+})
+launch_filter = ET.SubElement(new_garden, "intent-filter")
+ET.SubElement(launch_filter, "action", {android+"name": "android.intent.action.MAIN"})
+ET.SubElement(launch_filter, "category", {android+"name": "android.intent.category.LAUNCHER"})
 petal_tree.write(petal, encoding="utf-8", xml_declaration=True)
 if (removed_main,found_main,removed_petal,found_petal) != (0,1,1,0):
     raise RuntimeError("Unexpected launcher state: main=%s petal=%s" % ((removed_main,found_main),(removed_petal,found_petal)))
