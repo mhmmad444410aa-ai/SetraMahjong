@@ -24,7 +24,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - run: gradle :app:assembleDebug :app:lintDebug --no-daemon
+      - name: Assemble and lint
+        run: |
+          set +e
+          gradle :app:assembleDebug :app:lintDebug --no-daemon
+          result=$?
+          if [ "$result" -ne 0 ]; then
+            find app/build -name 'lint-results-debug.txt' -type f -exec cat {} \;
+          fi
+          exit "$result"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Setra-lint-report
+          path: app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
           name: Setra-2.0-debug-test-only
