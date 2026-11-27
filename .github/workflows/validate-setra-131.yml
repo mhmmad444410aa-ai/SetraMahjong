@@ -33,7 +33,7 @@ jobs:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: 'false'
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Build real Petal flavor Debug APK
         working-directory: project/SetraMahjong
         run: ./gradlew :engine:test :app:assembleDebug --no-daemon -PpetalAds=true
